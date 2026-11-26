@@ -40,6 +40,10 @@ export struct HomePage {
     this.navPathStack.pushPathByName('Add', null);
   }
 
+  private gotoNetwork(): void {
+    this.navPathStack.pushPathByName('Network', null);
+  }
+
   private gotoEdit(todo: Todo): void {
     this.navPathStack.pushPathByName('Add', todo);
   }
@@ -139,6 +143,28 @@ export struct HomePage {
         }
         .width('100%')
         .padding({ left: 20, right: 20, top: 18, bottom: 8 })
+
+        Button() {
+          Row({ space: 8 }) {
+            SymbolGlyph(Sym.refresh)
+              .fontSize(15)
+              .fontColor([Theme.accent])
+            Text('网络示例')
+              .fontSize(Theme.tSub)
+              .fontColor(Theme.fg)
+            Text('远端列表 · 圆环统计')
+              .fontSize(Theme.tMicro)
+              .fontColor(Theme.fgDim)
+          }
+        }
+        .id('home-network-entry')
+        .height(36)
+        .backgroundColor(Theme.card)
+        .borderRadius(Theme.rPill)
+        .border({ width: 0.8, color: Theme.border })
+        .margin({ left: 20, right: 20, top: 2, bottom: 6 })
+        .alignSelf(ItemAlign.Start)
+        .onClick(() => this.gotoNetwork())
 
         if (this.store.storageError !== '' || this.store.notice !== '') {
           Row({ space: 8 }) {

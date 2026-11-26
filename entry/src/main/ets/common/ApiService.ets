@@ -11,17 +11,33 @@ export class RemoteTodo {
 
 // 网络请求封装：加载远端示例数据并做异常处理
 export class ApiService {
-  static async fetchDefaultTodos(): Promise<Todo[]> {
+  static fetchDefaultTodos(): Promise<Todo[]> {
+    return ApiService.fetchRemoteTodos('normal');
+  }
+
+  // 仅允许固定公开接口，空列表与错误演示同样发起真实远端请求。
+  static async fetchRemoteTodos(mode: string = 'normal'): Promise<Todo[]> {
+    let url: string = 'https://jsonplaceholder.typicode.com/todos';
+    if (mode === 'empty') {
+      url = 'https://jsonplaceholder.typicode.com/todos?userId=0';
+    } else if (mode === 'error') {
+      url = 'https://jsonplaceholder.typicode.com/this-route-does-not-exist';
+    } else if (mode !== 'normal') {
+      throw new Error('不支持的远端请求场景');
+    }
     // 1. 创建 http 请求
     const httpRequest = http.createHttp();
     try {
       // 2. 发起 GET 请求获取示例数据（jsonplaceholder 公开接口）
       const resp = await httpRequest.request(
-        'https://jsonplaceholder.typicode.com/todos',
+        url,
         {
           method: http.RequestMethod.GET,
           connectTimeout: 10000,
           readTimeout: 10000,
+          // 遵循系统网络代理；不绑定开发机地址或账号。
+          usingProxy: true,
+          usingCache: false,
           header: { 'Content-Type': 'application/json' },
         }
       );
