@@ -49,7 +49,7 @@ function harness() {
   vm.runInNewContext(runtime + '\n' + compiled, sandbox);
   Object.assign(state, sandbox.exports);
   state.store = () => { assert.equal(typeof state.NetworkStore, 'function', 'Independent NetworkStore must be implemented'); return state.NetworkStore.instance; };
-  state.fetch = mode => { assert.equal(typeof state.ApiService.fetchRemoteTodos, 'function', 'API must expose remote scenario requests'); return state.ApiService.fetchRemoteTodos(mode); };
+  state.fetch = (mode, proxy) => { assert.equal(typeof state.ApiService.fetchRemoteTodos, 'function', 'API must expose remote scenario requests'); return state.ApiService.fetchRemoteTodos(mode, proxy); };
   return state;
 }
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -126,6 +126,53 @@ test('initial failure is retryable and successful remote empty response is a loa
 test('loading network examples never reads or replaces personal TodoStore data', async () => {
   const h = harness(); const personal = h.TodoStore.instance; personal.todos = [new h.Todo(99, 'my own task', '', false, 0)]; const items = personal.todos;
   await h.store().load(); assert.equal(personal.todos, items); assert.equal(personal.todos[0].title, 'my own task'); assert.equal(h.formPushes, 0);
+});
+test('API passes an optional typed HTTP proxy and defaults back to system proxy', async () => {
+  const h = harness(); const proxy = { host: 'proxy.example.com', port: 8080, exclusionList: [] };
+  await h.fetch('normal', proxy); assert.deepEqual(plain(h.requests[0].options.usingProxy), proxy);
+  await h.fetch('normal'); assert.equal(h.requests[1].options.usingProxy, true);
+});
+test('applying session proxy validates, refreshes current scenario and never persists personal data', async () => {
+  const h = harness(); const store = h.store(); assert.equal(typeof store.applyProxy, 'function', 'Session proxy configuration must be implemented');
+  await store.load('empty'); const personal = h.TodoStore.instance; const todos = personal.todos;
+  assert.equal(await store.applyProxy('proxy.example.com', '8080'), true);
+  assert.equal(store.proxyHost, 'proxy.example.com'); assert.equal(store.proxyPort, 8080); assert.equal(store.proxyError, '');
+  assert.equal(h.requests.length, 2); assert.equal(h.requests[1].url, 'https://jsonplaceholder.typicode.com/todos?userId=0');
+  assert.deepEqual(plain(h.requests[1].options.usingProxy), { host: 'proxy.example.com', port: 8080, exclusionList: [] });
+  assert.equal(personal.todos, todos); assert.equal(h.formPushes, 0);
+});
+test('proxy rejects incomplete host/port, protocols, paths, newlines and invalid port syntax without requests', async () => {
+  const h = harness(); const store = h.store(); assert.equal(typeof store.applyProxy, 'function', 'Session proxy configuration must be implemented');
+  for (const [host, port] of [['proxy.example.com', ''], ['', '8080'], ['proxy.example.com', '0'], ['proxy.example.com', '65536'], ['proxy.example.com', '-1'], ['proxy.example.com', '8.5'], ['proxy.example.com', '1e3'], ['proxy.example.com', '80x'], ['http://proxy.example.com', '80'], ['proxy.example.com/path', '80'], ['proxy.example.com\n', '80'], ['\r\n', ''], ['proxy\\evil', '80'], ['user@proxy.example.com', '80']]) {
+    assert.equal(await store.applyProxy(host, port), false, `Must reject ${JSON.stringify([host, port])}`);
+    assert.ok(store.proxyError); assert.equal(store.proxyHost, ''); assert.equal(store.proxyPort, 0); assert.equal(h.requests.length, 0);
+  }
+});
+test('proxy boundary ports are accepted and empty fields explicitly restore system mode', async () => {
+  const h = harness(); const store = h.store(); assert.equal(typeof store.applyProxy, 'function', 'Session proxy configuration must be implemented');
+  assert.equal(await store.applyProxy('proxy.example.com', '1'), true); assert.equal(store.proxyPort, 1);
+  assert.equal(await store.applyProxy('proxy.example.com', '65535'), true); assert.equal(store.proxyPort, 65535);
+  assert.equal(await store.applyProxy('', ''), true); assert.equal(store.proxyHost, ''); assert.equal(store.proxyPort, 0); assert.equal(store.proxyError, '');
+  assert.equal(h.requests.at(-1).options.usingProxy, true);
+});
+test('loading rejects proxy changes while preserving the active request configuration', async () => {
+  const h = harness(); const store = h.store(); assert.equal(typeof store.applyProxy, 'function', 'Session proxy configuration must be implemented');
+  await store.applyProxy('proxy.example.com', '8080'); let finish; h.respond = () => new Promise(resolve => { finish = resolve; });
+  const pending = store.load(); assert.equal(store.loading, true);
+  assert.equal(await store.applyProxy('another.example.com', '9000'), false); assert.equal(await store.applyProxy('', ''), false);
+  assert.equal(store.proxyHost, 'proxy.example.com'); assert.equal(store.proxyPort, 8080); assert.match(store.proxyError, /请求中/); assert.equal(h.requests.length, 2);
+  assert.deepEqual(plain(h.requests[1].options.usingProxy), { host: 'proxy.example.com', port: 8080, exclusionList: [] });
+  finish(settleResponse([])); await pending;
+});
+test('proxy settings are foldable session UI and short pages align at the top', () => {
+  const page = fs.readFileSync(path.join(sourceRoot, 'pages/NetworkPage.ets'), 'utf8');
+  assert.match(page, /预览网络设置/); assert.match(page, /当前预览会话/); assert.match(page, /不写入文件/); assert.match(page, /\.align\(Alignment\.Top\)/);
+  for (const id of ['network-proxy-toggle', 'network-proxy-host', 'network-proxy-port', 'network-proxy-apply', 'network-proxy-system']) assert.ok(page.includes(`.id('${id}')`), `Missing test id ${id}`);
+  assert.doesNotMatch(page, /127\.0\.0\.1|10090/);
+  for (const id of ['network-normal', 'network-empty', 'network-error']) {
+    const start = page.indexOf(`.id('${id}')`); const block = page.slice(start, page.indexOf('.onClick', start));
+    assert.match(block, /\.height\(36\)/); assert.match(block, /\.padding\(\{ left: 8, right: 8 \}\)/);
+  }
 });
 test('NetworkPage starts its own load, Home opens the registered route and chart is native', () => {
   const file = path.join(sourceRoot, 'pages/NetworkPage.ets'); assert.ok(fs.existsSync(file), 'NetworkPage must exist');

@@ -16,7 +16,7 @@ export class ApiService {
   }
 
   // 仅允许固定公开接口，空列表与错误演示同样发起真实远端请求。
-  static async fetchRemoteTodos(mode: string = 'normal'): Promise<Todo[]> {
+  static async fetchRemoteTodos(mode: string = 'normal', proxy: http.HttpProxy | undefined = undefined): Promise<Todo[]> {
     let url: string = 'https://jsonplaceholder.typicode.com/todos';
     if (mode === 'empty') {
       url = 'https://jsonplaceholder.typicode.com/todos?userId=0';
@@ -35,8 +35,8 @@ export class ApiService {
           method: http.RequestMethod.GET,
           connectTimeout: 10000,
           readTimeout: 10000,
-          // 遵循系统网络代理；不绑定开发机地址或账号。
-          usingProxy: true,
+          // 默认遵循系统代理，也允许本次预览会话显式指定 HTTP 代理。
+          usingProxy: proxy === undefined ? true : proxy,
           usingCache: false,
           header: { 'Content-Type': 'application/json' },
         }

@@ -15,7 +15,7 @@ try {
     & $node (Join-Path $DevEcoHome 'tools\hvigor\bin\hvigorw.js') --mode module -p module=entry@default -p product=default assembleHap --no-daemon
     if($LASTEXITCODE -ne 0) { throw 'HarmonyOS 构建未通过' }
   }
-  Write-Output '所有本地检查通过。安装、设备存储与卡片宿主仍需设备验收。'
+  Write-Output '所有本地检查通过。课程 Previewer 交互结果请另看本轮验收记录；设备存储与卡片宿主为扩展验证。'
 } finally {
   Pop-Location
 }

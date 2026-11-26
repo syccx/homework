@@ -9,6 +9,9 @@ export struct NetworkPage {
   @Param navPathStack: NavPathStack = new NavPathStack();
   @Local store: NetworkStore = NetworkStore.instance;
   @Local refreshing: boolean = false;
+  @Local proxyOpen: boolean = false;
+  @Local proxyHostInput: string = '';
+  @Local proxyPortInput: string = '';
 
   aboutToAppear(): void {
     this.store.load();
@@ -17,6 +20,23 @@ export struct NetworkPage {
   private refresh(): void {
     this.store.load().finally(() => {
       this.refreshing = false;
+    });
+  }
+
+  private toggleProxySettings(): void {
+    this.proxyOpen = !this.proxyOpen;
+    if (this.proxyOpen) {
+      this.proxyHostInput = this.store.proxyHost;
+      this.proxyPortInput = this.store.proxyPort === 0 ? '' : this.store.proxyPort.toString();
+    }
+  }
+
+  private restoreSystemProxy(): void {
+    this.store.applyProxy('', '').then((accepted: boolean) => {
+      if (accepted) {
+        this.proxyHostInput = '';
+        this.proxyPortInput = '';
+      }
     });
   }
 
@@ -73,6 +93,7 @@ export struct NetworkPage {
           Scroll() {
             Column({ space: 16 }) {
               this.scenarios()
+              this.previewNetworkSettings()
 
               if (this.store.loading) {
                 Row({ space: 10 }) {
@@ -135,6 +156,7 @@ export struct NetworkPage {
           }
           .width('100%')
           .height('100%')
+          .align(Alignment.Top)
           .scrollBar(BarState.Off)
           .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
         }
@@ -159,6 +181,8 @@ export struct NetworkPage {
       Row({ space: 8 }) {
         Button('正常')
           .id('network-normal')
+          .height(36)
+          .padding({ left: 8, right: 8 })
           .layoutWeight(1)
           .fontSize(Theme.tSub)
           .fontColor(this.store.mode === 'normal' ? Theme.onAccent : Theme.fg)
@@ -167,6 +191,8 @@ export struct NetworkPage {
           .onClick(() => { this.store.load('normal'); })
         Button('空列表')
           .id('network-empty')
+          .height(36)
+          .padding({ left: 8, right: 8 })
           .layoutWeight(1)
           .fontSize(Theme.tSub)
           .fontColor(this.store.mode === 'empty' ? Theme.onAccent : Theme.fg)
@@ -175,6 +201,8 @@ export struct NetworkPage {
           .onClick(() => { this.store.load('empty'); })
         Button('HTTP 错误')
           .id('network-error')
+          .height(36)
+          .padding({ left: 8, right: 8 })
           .layoutWeight(1)
           .fontSize(Theme.tSub)
           .fontColor(this.store.mode === 'error' ? Theme.onAccent : Theme.fg)
@@ -193,6 +221,81 @@ export struct NetworkPage {
     .alignItems(HorizontalAlign.Start)
     .padding(16)
     .width('100%')
+    .borderRadius(Theme.rCard)
+    .backgroundColor(Theme.card)
+  }
+
+  @Builder
+  previewNetworkSettings() {
+    Column({ space: 10 }) {
+      Button(this.proxyOpen ? '收起预览网络设置' : '预览网络设置')
+        .id('network-proxy-toggle')
+        .fontSize(Theme.tSub)
+        .fontColor(Theme.accent)
+        .backgroundColor(Theme.cardHi)
+        .height(36)
+        .onClick(() => this.toggleProxySettings())
+      Text(this.store.proxyHost === '' ? '当前：系统代理' : `当前：HTTP 代理 ${this.store.proxyHost}:${this.store.proxyPort}`)
+        .id('network-proxy-current')
+        .fontSize(Theme.tMicro)
+        .fontColor(Theme.fgDim)
+      if (this.proxyOpen) {
+        Text('仅当前预览会话使用，不写入文件或个人待办。若系统代理无法联网，可填写可用的 HTTP 代理；无需代理时恢复系统设置。')
+          .fontSize(Theme.tMicro)
+          .fontColor(Theme.fgDim)
+        TextInput({ placeholder: '代理主机名或 IPv4 地址（不含 http://）', text: this.proxyHostInput })
+          .id('network-proxy-host')
+          .fontSize(Theme.tSub)
+          .fontColor(Theme.fg)
+          .placeholderColor(Theme.fgFaint)
+          .backgroundColor(Theme.cardHi)
+          .height(42)
+          .enabled(!this.store.loading)
+          .onChange((value: string) => { this.proxyHostInput = value; })
+        TextInput({ placeholder: '代理端口（1–65535）', text: this.proxyPortInput })
+          .id('network-proxy-port')
+          .type(InputType.Number)
+          .fontSize(Theme.tSub)
+          .fontColor(Theme.fg)
+          .placeholderColor(Theme.fgFaint)
+          .backgroundColor(Theme.cardHi)
+          .height(42)
+          .enabled(!this.store.loading)
+          .onChange((value: string) => { this.proxyPortInput = value; })
+        if (this.store.proxyError !== '') {
+          Text(this.store.proxyError)
+            .id('network-proxy-validation')
+            .fontSize(Theme.tSub)
+            .fontColor(Theme.danger)
+        }
+        Row({ space: 8 }) {
+          Button('应用并请求')
+            .id('network-proxy-apply')
+            .height(36)
+            .padding({ left: 12, right: 12 })
+            .layoutWeight(1)
+            .fontSize(Theme.tSub)
+            .fontColor(Theme.onAccent)
+            .backgroundColor(Theme.accent)
+            .enabled(!this.store.loading)
+            .onClick(() => { this.store.applyProxy(this.proxyHostInput, this.proxyPortInput); })
+          Button('恢复系统代理')
+            .id('network-proxy-system')
+            .height(36)
+            .padding({ left: 12, right: 12 })
+            .layoutWeight(1)
+            .fontSize(Theme.tSub)
+            .fontColor(Theme.fg)
+            .backgroundColor(Theme.cardHi)
+            .enabled(!this.store.loading)
+            .onClick(() => this.restoreSystemProxy())
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
+    .padding(16)
+    .alignItems(HorizontalAlign.Start)
     .borderRadius(Theme.rCard)
     .backgroundColor(Theme.card)
   }
