@@ -315,9 +315,9 @@ export struct HomePage {
 
       // 筛选条
       Row({ space: 8 }) {
-        this.filterChip('all', '全部', this.store.todoCount + this.store.doneCount)
-        this.filterChip('active', '进行中', this.store.todoCount)
-        this.filterChip('done', '已完成', this.store.doneCount)
+        this.filterChip('all', '全部')
+        this.filterChip('active', '进行中')
+        this.filterChip('done', '已完成')
         Blank()
         // 统计展开开关
         Text(this.statOpen ? '收起统计' : '统计')
@@ -659,13 +659,15 @@ export struct HomePage {
   }
 
   @Builder
-  filterChip(key: string, label: string, count: number) {
+  filterChip(key: string, label: string) {
     Row({ space: 5 }) {
       Text(label)
         .fontSize(Theme.tMicro)
         .fontWeight(this.store.filter === key ? FontWeight.Medium : FontWeight.Normal)
         .fontColor(this.store.filter === key ? Theme.fg : Theme.fgDim)
-      Text(count.toString())
+      // 在 Text 更新回调内读取仓库，避免 @Builder 普通数值参数停留在首次创建时的快照。
+      Text((key === 'all' ? this.store.todoCount + this.store.doneCount :
+        key === 'active' ? this.store.todoCount : this.store.doneCount).toString())
         .fontSize(Theme.tMicro)
         .fontColor(this.store.filter === key ? Theme.accent : Theme.fgFaint)
     }
