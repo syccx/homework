@@ -1,0 +1,28 @@
+# Dependencies and generated build/preview output
+oh_modules/
+.ohpm_cache/
+.hvigor/
+build/
+.preview/
+.appanalyzer/
+
+# Local IDE, device and signing settings
+.idea/
+local.properties
+phoneSettingConfig*.json
+*.p12
+*.p7b
+*.jks
+*.keystore
+*.cer
+*.csr
+*.pem
+*.key
+
+# Generated packages and operating-system files
+*.hap
+*.hsp
+*.app
+*.log
+Thumbs.db
+.DS_Store

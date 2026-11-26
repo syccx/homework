@@ -1,0 +1,32 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "待办事项管理模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "记录、安排并完成每天的待办事项"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "待办清单"
+    },
+    {
+      "name": "EntryFormAbility_desc",
+      "value": "在桌面查看待办数量和最新事项"
+    },
+    {
+      "name": "EntryFormAbility_label",
+      "value": "待办清单卡片"
+    },
+    {
+      "name": "widget_desc",
+      "value": "显示未完成数量与最新待办，点击打开应用"
+    },
+    {
+      "name": "widget_display_name",
+      "value": "待办概览"
+    }
+  ]
+}

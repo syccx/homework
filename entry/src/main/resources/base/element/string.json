@@ -1,0 +1,32 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Todo task management"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Create, organize and complete your tasks"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "待办清单"
+    },
+    {
+      "name": "EntryFormAbility_desc",
+      "value": "View your pending tasks on the home screen"
+    },
+    {
+      "name": "EntryFormAbility_label",
+      "value": "待办清单卡片"
+    },
+    {
+      "name": "widget_desc",
+      "value": "Pending count and the newest task"
+    },
+    {
+      "name": "widget_display_name",
+      "value": "待办概览"
+    }
+  ]
+}
