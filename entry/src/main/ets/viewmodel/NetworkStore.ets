@@ -23,6 +23,8 @@ export class NetworkStore {
   @Trace lastUpdatedAt: number = 0;
   @Trace mode: string = 'normal';
   @Trace lastSuccessfulMode: string = '';
+  @Trace sampleGroup: number = 1;
+  @Trace lastSuccessfulGroup: number = 1;
   @Trace proxyHost: string = '';
   @Trace proxyPort: number = 0;
   @Trace proxyError: string = '';
@@ -79,28 +81,43 @@ export class NetworkStore {
   }
 
   // 重复刷新始终重新请求；请求中合并调用，避免慢响应覆盖新状态。
-  load(mode: string = this.mode): Promise<void> {
+  load(mode: string = this.mode, sampleGroup: number = this.sampleGroup): Promise<void> {
     if (this.inFlight !== undefined) {
       return this.inFlight;
     }
+    if (mode !== 'normal' && mode !== 'empty' && mode !== 'error') {
+      this.error = '不支持的远端请求场景';
+      return Promise.resolve();
+    }
+    if (sampleGroup !== 1 && sampleGroup !== 2) {
+      this.error = '不支持的远端数据分组';
+      return Promise.resolve();
+    }
     this.mode = mode;
+    this.sampleGroup = sampleGroup;
     this.loading = true;
     this.error = '';
-    this.inFlight = this.request(mode);
+    this.inFlight = this.request(mode, sampleGroup);
     return this.inFlight;
   }
 
-  private async request(mode: string): Promise<void> {
+  // 切换两组真实远端样本以对比图表；刷新与重试仍保持当前请求组。
+  loadNextGroup(): Promise<void> {
+    return this.load('normal', this.sampleGroup === 1 ? 2 : 1);
+  }
+
+  private async request(mode: string, sampleGroup: number): Promise<void> {
     try {
       const proxy: http.HttpProxy | undefined = this.proxyHost === '' ? undefined : {
         host: this.proxyHost,
         port: this.proxyPort,
         exclusionList: []
       };
-      const items = await ApiService.fetchRemoteTodos(mode, proxy);
+      const items = await ApiService.fetchRemoteTodos(mode, proxy, sampleGroup);
       this.items = items;
       this.loaded = true;
       this.lastSuccessfulMode = mode;
+      this.lastSuccessfulGroup = sampleGroup;
       this.lastUpdatedAt = Date.now();
     } catch (e) {
       this.error = (e as Error).message || '远端请求失败，请检查网络后重试';

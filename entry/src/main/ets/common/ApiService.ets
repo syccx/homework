@@ -16,7 +16,11 @@ export class ApiService {
   }
 
   // 仅允许固定公开接口，空列表与错误演示同样发起真实远端请求。
-  static async fetchRemoteTodos(mode: string = 'normal', proxy: http.HttpProxy | undefined = undefined): Promise<Todo[]> {
+  static async fetchRemoteTodos(mode: string = 'normal', proxy: http.HttpProxy | undefined = undefined,
+    sampleGroup: number = 1): Promise<Todo[]> {
+    if (sampleGroup !== 1 && sampleGroup !== 2) {
+      throw new Error('不支持的远端数据分组');
+    }
     let url: string = 'https://jsonplaceholder.typicode.com/todos';
     if (mode === 'empty') {
       url = 'https://jsonplaceholder.typicode.com/todos?userId=0';
@@ -45,7 +49,7 @@ export class ApiService {
       if (resp.responseCode !== 200) {
         throw new Error(`状态码 ${resp.responseCode}`);
       }
-      // 4. 解析结果并映射为 Todo 数组，只取前 5 条作示例
+      // 4. 每次均从本次真实响应取样；默认前 5 条，正常场景可切到第 6–10 条。
       if (typeof resp.result !== 'string') {
         throw new Error('接口返回的数据格式不正确');
       }
@@ -53,7 +57,8 @@ export class ApiService {
       if (!Array.isArray(data)) {
         throw new Error('接口返回的不是待办列表');
       }
-      return data.slice(0, 5).map((item, index) => {
+      const start: number = mode === 'normal' ? (sampleGroup - 1) * 5 : 0;
+      return data.slice(start, start + 5).map((item, index) => {
         if (item === null || typeof item !== 'object' || !Number.isSafeInteger(item.id) || item.id <= 0 ||
           typeof item.title !== 'string' || item.title.trim() === '' || item.title.length > 200 ||
           typeof item.completed !== 'boolean') {

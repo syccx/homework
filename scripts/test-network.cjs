@@ -49,11 +49,94 @@ function harness() {
   vm.runInNewContext(runtime + '\n' + compiled, sandbox);
   Object.assign(state, sandbox.exports);
   state.store = () => { assert.equal(typeof state.NetworkStore, 'function', 'Independent NetworkStore must be implemented'); return state.NetworkStore.instance; };
-  state.fetch = (mode, proxy) => { assert.equal(typeof state.ApiService.fetchRemoteTodos, 'function', 'API must expose remote scenario requests'); return state.ApiService.fetchRemoteTodos(mode, proxy); };
+  state.fetch = (mode, proxy, sampleGroup) => { assert.equal(typeof state.ApiService.fetchRemoteTodos, 'function', 'API must expose remote scenario requests'); return state.ApiService.fetchRemoteTodos(mode, proxy, sampleGroup); };
   return state;
 }
 const plain = value => JSON.parse(JSON.stringify(value));
 const settleResponse = list => ({ responseCode: 200, result: JSON.stringify(list) });
+const groupedResponse = () => Array.from({ length: 10 }, (_, i) => ({ id: i + 1, title: `remote ${i + 1}`, completed: i === 0 || (i >= 5 && i < 9) }));
+
+function pageStateLabels(store) {
+  const page = fs.readFileSync(path.join(sourceRoot, 'pages/NetworkPage.ets'), 'utf8');
+  const methods = ['scenarioLabel', 'updatedLabel'].map(name => {
+    const start = page.indexOf(`  private ${name}(`); const end = page.indexOf('\n  }', start);
+    assert.ok(start >= 0 && end > start, `Missing page method ${name}`);
+    return page.slice(start, end + 4);
+  }).join('\n');
+  const code = ts.transpileModule(`class Page { ${methods} } exports.Page = Page;`, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  const sandbox = { exports: {} }; vm.runInNewContext(code, sandbox); const instance = new sandbox.exports.Page(); instance.store = store;
+  return { successful: instance.updatedLabel(), requested: instance.scenarioLabel(store.mode, store.sampleGroup) };
+}
+
+test('normal groups take different five-item slices from each fresh response and preserve the default API', async () => {
+  const h = harness(); h.respond = async () => settleResponse(groupedResponse());
+  assert.deepEqual(plain((await h.fetch('normal')).map(item => item.id)), [1, 2, 3, 4, 5]);
+  const second = await h.fetch('normal', undefined, 2);
+  assert.deepEqual(plain(second.map(item => item.id)), [6, 7, 8, 9, 10]);
+  assert.equal(second.filter(item => item.done).length, 4);
+  h.respond = async () => settleResponse(groupedResponse().map(item => ({ ...item, completed: false })));
+  assert.equal((await h.fetch('normal', undefined, 2)).filter(item => item.done).length, 0);
+  assert.equal(h.requests.length, 3); assert.ok(h.requests.every(request => request.url === 'https://jsonplaceholder.typicode.com/todos'));
+});
+test('invalid normal sample groups fail before opening a request', async () => {
+  const h = harness();
+  for (const sampleGroup of [0, 3, -1, 1.5, NaN]) await assert.rejects(h.fetch('normal', undefined, sampleGroup), /分组/);
+  assert.equal(h.requests.length, 0); assert.equal(h.destroys, 0);
+});
+test('invalid Store groups preserve the last valid selection and ordinary refresh remains usable', async () => {
+  const h = harness(); const store = h.store(); h.respond = async () => settleResponse(groupedResponse()); await store.load('normal', 2);
+  for (const sampleGroup of [3, 0, -1, 1.5, NaN]) {
+    const items = store.items; const updated = store.lastUpdatedAt; const requestCount = h.requests.length;
+    await store.load('normal', sampleGroup);
+    assert.equal(store.sampleGroup, 2); assert.equal(store.mode, 'normal'); assert.equal(store.lastSuccessfulGroup, 2);
+    assert.equal(store.items, items); assert.equal(store.lastUpdatedAt, updated); assert.equal(store.loading, false); assert.match(store.error, /分组/);
+    assert.equal(h.requests.length, requestCount); await store.load();
+    assert.equal(h.requests.length, requestCount + 1); assert.equal(store.error, ''); assert.equal(store.items[0].id, 6);
+  }
+});
+test('invalid Store modes preserve the last valid selection and ordinary refresh remains usable', async () => {
+  const h = harness(); const store = h.store(); h.respond = async () => settleResponse(groupedResponse()); await store.load('normal', 2);
+  for (const mode of ['', 'unsupported', 'https://untrusted.invalid']) {
+    const items = store.items; const updated = store.lastUpdatedAt; const requestCount = h.requests.length;
+    await store.load(mode);
+    assert.equal(store.mode, 'normal'); assert.equal(store.sampleGroup, 2); assert.equal(store.lastSuccessfulMode, 'normal');
+    assert.equal(store.items, items); assert.equal(store.lastUpdatedAt, updated); assert.equal(store.loading, false); assert.match(store.error, /场景/);
+    assert.equal(h.requests.length, requestCount); await store.load();
+    assert.equal(h.requests.length, requestCount + 1); assert.equal(store.error, ''); assert.equal(store.items[0].id, 6);
+  }
+});
+test('switching normal sample groups requests again, changes chart values and refreshes the selected group', async () => {
+  const h = harness(); const store = h.store(); h.respond = async () => settleResponse(groupedResponse());
+  await store.load(); assert.equal(store.sampleGroup, 1); assert.equal(store.lastSuccessfulGroup, 1); assert.deepEqual(plain(store.chartValues), [1, 4]);
+  assert.equal(typeof store.loadNextGroup, 'function', 'Remote chart needs a real-data group switch');
+  await store.loadNextGroup(); assert.equal(store.sampleGroup, 2); assert.equal(store.lastSuccessfulGroup, 2); assert.deepEqual(plain(store.chartValues), [4, 1]);
+  assert.equal(store.items[0].id, 6); await store.load(); assert.equal(store.items[0].id, 6); assert.equal(store.sampleGroup, 2);
+  await store.loadNextGroup(); assert.equal(store.sampleGroup, 1); assert.equal(store.items[0].id, 1); assert.equal(h.requests.length, 4);
+});
+test('failed group requests preserve successful group labels and retry the selected sample', async () => {
+  const h = harness(); const store = h.store(); h.respond = async () => settleResponse(groupedResponse()); await store.load();
+  const items = store.items; const updated = store.lastUpdatedAt;
+  assert.equal(typeof store.loadNextGroup, 'function', 'Remote chart needs a real-data group switch');
+  h.respond = async () => ({ responseCode: 503, result: '{}' }); await store.loadNextGroup();
+  assert.equal(store.sampleGroup, 2); assert.equal(store.lastSuccessfulGroup, 1); assert.equal(store.items, items); assert.equal(store.lastUpdatedAt, updated);
+  assert.deepEqual(plain(store.chartValues), [1, 4]); const labels = pageStateLabels(store);
+  assert.match(labels.requested, /第 2 组/); assert.match(labels.successful, /第 1 组/); assert.doesNotMatch(labels.successful, /第 2 组/);
+  h.respond = async () => settleResponse(groupedResponse()); await store.load();
+  assert.equal(store.error, ''); assert.equal(store.lastSuccessfulGroup, 2); assert.equal(store.items[0].id, 6); assert.match(pageStateLabels(store).successful, /第 2 组/);
+});
+test('empty and error scenarios keep the chosen normal group for a clear return to normal', async () => {
+  const h = harness(); const store = h.store(); h.respond = async () => settleResponse(groupedResponse()); await store.load();
+  assert.equal(typeof store.loadNextGroup, 'function', 'Remote chart needs a real-data group switch'); await store.loadNextGroup();
+  h.respond = async () => settleResponse([]); await store.load('empty'); assert.equal(store.sampleGroup, 2); assert.equal(pageStateLabels(store).successful.includes('第 2 组'), false);
+  h.respond = async () => ({ responseCode: 404, result: '{}' }); await store.load('error'); assert.equal(store.sampleGroup, 2);
+  h.respond = async () => settleResponse(groupedResponse()); await store.load('normal'); assert.equal(store.items[0].id, 6); assert.equal(store.lastSuccessfulGroup, 2);
+});
+test('normal sample switch is accessible and the chart names the successful source group', () => {
+  const page = fs.readFileSync(path.join(sourceRoot, 'pages/NetworkPage.ets'), 'utf8');
+  assert.ok(page.includes(".id('network-next-group')")); assert.match(page, /\.onClick\(\(\) => \{ this\.store\.loadNextGroup\(\); \}\)/);
+  const chart = page.slice(page.indexOf('  chart() {'), page.indexOf('  remoteList() {'));
+  assert.match(chart, /scenarioLabel\(this\.store\.lastSuccessfulMode, this\.store\.lastSuccessfulGroup\)/);
+});
 
 test('remote API whitelists real normal / empty / error paths, keeps legacy default API', async () => {
   const h = harness();

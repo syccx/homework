@@ -40,14 +40,14 @@ export struct NetworkPage {
     });
   }
 
-  private scenarioLabel(mode: string): string {
+  private scenarioLabel(mode: string, sampleGroup: number = this.store.sampleGroup): string {
     if (mode === 'empty') {
       return '空列表';
     }
     if (mode === 'error') {
       return 'HTTP 错误';
     }
-    return '正常列表';
+    return `正常列表 · 第 ${sampleGroup} 组`;
   }
 
   private updatedLabel(): string {
@@ -55,7 +55,7 @@ export struct NetworkPage {
       return '尚无成功结果';
     }
     const d = new Date(this.store.lastUpdatedAt);
-    return `上次成功：${d.toLocaleTimeString()} · ${this.scenarioLabel(this.store.lastSuccessfulMode)}`;
+    return `上次成功：${d.toLocaleTimeString()} · ${this.scenarioLabel(this.store.lastSuccessfulMode, this.store.lastSuccessfulGroup)}`;
   }
 
   build() {
@@ -211,7 +211,15 @@ export struct NetworkPage {
           .onClick(() => { this.store.load('error'); })
       }
       .width('100%')
-      Text('正常：GET /todos，校验后取前 5 条；空列表：GET /todos?userId=0；错误：GET /this-route-does-not-exist，预期远端返回 404。三种场景都实际联网，返回结果以服务端为准。')
+      Button(`切换正常样本：请求第 ${this.store.sampleGroup === 1 ? 2 : 1} 组`)
+        .id('network-next-group')
+        .height(36)
+        .fontSize(Theme.tSub)
+        .fontColor(Theme.accent)
+        .backgroundColor(Theme.cardHi)
+        .enabled(!this.store.loading)
+        .onClick(() => { this.store.loadNextGroup(); })
+      Text('正常：GET /todos，每次从真实响应取样，第 1 组为第 1–5 条，第 2 组为第 6–10 条，刷新保持当前组；空列表：GET /todos?userId=0；错误：GET /this-route-does-not-exist，预期远端返回 404。三种场景都实际联网，返回结果以服务端为准。')
         .fontSize(Theme.tMicro)
         .fontColor(Theme.fgDim)
       Text(`本次请求：${this.scenarioLabel(this.store.mode)}`)
@@ -340,6 +348,10 @@ export struct NetworkPage {
         .fontSize(Theme.tBody)
         .fontWeight(FontWeight.Medium)
         .fontColor(Theme.fg)
+      Text(`数据来源：${this.scenarioLabel(this.store.lastSuccessfulMode, this.store.lastSuccessfulGroup)}`)
+        .id('network-chart-source')
+        .fontSize(Theme.tMicro)
+        .fontColor(Theme.fgDim)
       Stack() {
         DataPanel({
           values: this.store.chartValues,
