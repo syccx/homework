@@ -166,6 +166,22 @@ export struct HomePage {
         .alignSelf(ItemAlign.Start)
         .onClick(() => this.gotoNetwork())
 
+        Button() {
+          Row({ space: 8 }) {
+            SymbolGlyph(Sym.listCheck).fontSize(16).fontColor([Theme.accent])
+            Text('DeepSeek 智能拆解').fontSize(Theme.tSub).fontWeight(FontWeight.Medium).fontColor(Theme.fg)
+            Text('目标变计划').fontSize(Theme.tMicro).fontColor(Theme.fgDim)
+          }
+        }
+        .id('home-deepseek-entry')
+        .height(38)
+        .backgroundColor(Theme.card)
+        .borderRadius(Theme.rPill)
+        .border({ width: 0.8, color: Theme.border })
+        .margin({ left: 20, right: 20, bottom: 6 })
+        .alignSelf(ItemAlign.Start)
+        .onClick(() => { this.navPathStack.pushPathByName('DeepSeek', null); })
+
         if (this.store.storageError !== '' || this.store.notice !== '') {
           Row({ space: 8 }) {
             Text(this.store.storageError || this.store.notice)

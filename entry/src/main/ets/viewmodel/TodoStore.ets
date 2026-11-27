@@ -55,6 +55,11 @@ export class TodoStore {
   private fetchTask: Promise<void> | undefined = undefined;
   private pendingBootstrap: boolean = false;
 
+  /** 区分损坏数据保护与可重试的临时落盘错误，供安全批量导入入口只读查询。 */
+  get isStorageProtected(): boolean {
+    return this.storageBlocked;
+  }
+
   async init(context: Context): Promise<void> {
     // Previewer 没有 Ability context；若正式初始化晚于首次操作，已接受的草稿也不能丢。
     const drafts: Todo[] = this.context === undefined ? [...this.todos] : [];

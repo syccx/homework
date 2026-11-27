@@ -1,6 +1,7 @@
 import { HomePage } from './HomePage';
 import { AddTodoPage } from './AddTodoPage';
 import { NetworkPage } from './NetworkPage';
+import { DeepSeekPage } from './DeepSeekPage';
 
 // 入口：Navigation 导航容器，注册目标页并使用路由入栈出栈
 @Entry
@@ -17,6 +18,8 @@ struct Index {
       AddTodoPage({ navPathStack: this.navPathStack })
     } else if (name === 'Network') {
       NetworkPage({ navPathStack: this.navPathStack })
+    } else if (name === 'DeepSeek') {
+      DeepSeekPage({ navPathStack: this.navPathStack })
     }
   }
 

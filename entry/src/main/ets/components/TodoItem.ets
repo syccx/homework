@@ -4,7 +4,7 @@ import { Sym } from '../common/Sym';
 
 /**
  * 单条待办卡片
- * 视觉：暗卡 + 1px 描边，完成态整体降透明（内容仍在，不隐藏信息）
+ * 视觉：暗卡 + 1px 描边，完成态文字弱化，卡片背景保持不透明
  * 交互：
  *  - 点勾选圆环 → 切换完成
  *  - 点文本区 → 进编辑页
@@ -41,6 +41,7 @@ export struct TodoItem {
       .height('100%')
       .borderRadius(Theme.rItem)
       .backgroundColor('#2A1518')
+      .visibility(this.offsetX < 0 ? Visibility.Visible : Visibility.Hidden)
       .onClick(() => {
         this.onDelete(this.todo);
       })
@@ -99,16 +100,17 @@ export struct TodoItem {
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
+        .opacity(this.todo.done ? 0.45 : 1)
         .onClick(() => {
           this.onEdit(this.todo);
         })
       }
       .width('100%')
+      .height('100%')
       .padding({ left: 16, right: 16, top: 14, bottom: 14 })
       .borderRadius(Theme.rItem)
       .backgroundColor(Theme.card)
       .border({ width: 0.8, color: Theme.border })
-      .opacity(this.todo.done ? 0.45 : 1)
       .translate({ x: this.offsetX })
       .gesture(
         PanGesture({ direction: PanDirection.Horizontal, fingers: 1 })

@@ -5,7 +5,7 @@ $node = Join-Path $DevEcoHome 'tools\node\node.exe'
 if(-not (Test-Path -LiteralPath $node)) { throw "找不到 DevEco 内置 Node：$node" }
 Push-Location -LiteralPath $projectRoot
 try {
-  foreach($script in @('test-store.cjs','test-forms.cjs','test-pages.cjs','test-date.cjs','test-reactivity.cjs','test-network.cjs')) {
+  foreach($script in @('test-store.cjs','test-forms.cjs','test-pages.cjs','test-date.cjs','test-reactivity.cjs','test-network.cjs','test-components.cjs','test-deepseek.cjs')) {
     & $node (Join-Path $PSScriptRoot $script)
     if($LASTEXITCODE -ne 0) { throw "$script 检查未通过" }
   }
