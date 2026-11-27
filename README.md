@@ -16,7 +16,7 @@ HarmonyOS 原生待办应用，采用 ArkTS、Stage 模型、ArkUI 状态管理 
 
 ## 已实现功能
 
-本次Git归档保留原有六条提交，并于2026年11月27日追加DeepSeek与待办交互、示例任务体验及报告材料等提交，不重建仓库、不改写旧提交。目标远端为 `https://github.com/syccx/homework.git`；实际分支与推送结果以Git远端核验为准。报告附件的“当前六条”和未提交说明记录归档前定稿时点，后续请查看 `git log --graph --oneline --decorate --all`。本次归档范围与提交前检查见 `docs/Git提交与交付记录_2026-11-27.md`。
+本次Git归档保留原有六条提交，并于2026年11月27日追加DeepSeek与待办交互、示例任务体验及报告材料等提交，不重建仓库、不改写旧提交。已普通推送至 `https://github.com/syccx/homework.git` 的main分支，首次发布后实际核对远端与本地提交ID一致。报告附件的“当前六条”和未提交说明记录归档前定稿时点，后续请查看 `git log --graph --oneline --decorate --all`。归档与发布验证见 `docs/Git提交与交付记录_2026-11-27.md`。
 
 - DeepSeek 智能拆解：自行配置 API Key，将目标拆成 3–6 条中文建议，先预览、确认后统一保存，同一份已加入计划不会重复导入；提供明确标注的离线课堂示例。
 
