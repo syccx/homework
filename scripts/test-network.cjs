@@ -68,6 +68,198 @@ function pageStateLabels(store) {
   return { successful: instance.updatedLabel(), requested: instance.scenarioLabel(store.mode, store.sampleGroup) };
 }
 
+// Record the actual ArkUI builder tree to verify visibility and event wiring.
+// Like test-components.cjs, this checks source behavior rather than native pixels/hit testing.
+function networkPageHarness(store) {
+  const pageSource = fs.readFileSync(path.join(sourceRoot, 'pages/NetworkPage.ets'), 'utf8');
+  const ast = ts.createSourceFile('NetworkPage.ets', pageSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.ETS);
+  const component = ast.statements.find(node => node.name?.getText(ast) === 'NetworkPage');
+  assert.ok(component?.members, 'NetworkPage must remain an ArkUI component');
+  const builderMembers = component.members.filter(node => node.body && (node.name?.getText(ast) === 'build' || /@Builder\b/.test(node.getText(ast))));
+  const builders = new Map(builderMembers.map(node => [node.name.getText(ast), node]));
+  const methods = component.members.filter(node => node.body && !builderMembers.includes(node)).map(node => node.getText(ast)).join('\n');
+  const compilerOptions = { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 };
+  const enumeration = new Proxy({}, { get: (_, name) => String(name) });
+  const box = {
+    exports: {}, Date, Math, Number, JSON, NetworkStore: { instance: store },
+    NavPathStack: class { pop() {} }, $r: resource => resource,
+    FontWeight: enumeration, HorizontalAlign: enumeration, Alignment: enumeration,
+    EdgeEffect: enumeration, BarState: enumeration, TextAlign: enumeration,
+    InputType: enumeration, DataPanelType: enumeration, FlexAlign: enumeration,
+    TextOverflow: enumeration, Visibility: enumeration, Color: enumeration
+  };
+  const helpers = ['common/Theme.ets', 'common/Sym.ets'].map(file => fs.readFileSync(path.join(sourceRoot, file), 'utf8')).join('\n').replace(/^import .*$/gm, '');
+  vm.runInNewContext(ts.transpileModule(helpers, { compilerOptions }).outputText, box);
+  Object.assign(box, box.exports);
+  vm.runInNewContext(ts.transpileModule(`class Page { ${methods} } exports.Page = Page;`, { compilerOptions }).outputText, box);
+  const page = new box.exports.Page();
+  function evaluate(node, locals = {}) {
+    const expression = node.getText(ast).replace(/\$\$this\./g, 'this.');
+    const code = ts.transpileModule(`(function(${Object.keys(locals).join(',')}) { return (${expression}); })`, { compilerOptions }).outputText;
+    return vm.runInNewContext(code, box).call(page, ...Object.values(locals));
+  }
+  for (const member of component.members) {
+    if (member.initializer && member.name) page[member.name.getText(ast)] = evaluate(member.initializer);
+  }
+  // Always bind the supplied real store, even if the component later changes singleton access syntax.
+  page.store = store;
+  function chain(expression) {
+    assert.ok(ts.isCallExpression(expression), `Expected ArkUI call: ${expression.getText(ast)}`);
+    const call = { args: expression.arguments, name: undefined };
+    if (ts.isPropertyAccessExpression(expression.expression) && ts.isCallExpression(expression.expression.expression)) {
+      call.name = expression.expression.name.text;
+      return [...chain(expression.expression.expression), call];
+    }
+    call.name = expression.expression.getText(ast);
+    return [call];
+  }
+  function record(statements, locals = {}) {
+    const nodes = [];
+    for (let index = 0; index < statements.length; index++) {
+      const statement = statements[index];
+      if (ts.isIfStatement(statement)) {
+        const branch = evaluate(statement.expression, locals) ? statement.thenStatement : statement.elseStatement;
+        if (branch) nodes.push(...record(ts.isBlock(branch) ? branch.statements : [branch], locals));
+        continue;
+      }
+      assert.ok(ts.isExpressionStatement(statement), `Unexpected builder statement: ${statement.getText(ast)}`);
+      const calls = chain(statement.expression); const first = calls[0];
+      if (first.name.startsWith('this.') && builders.has(first.name.slice(5))) {
+        nodes.push(...record(builders.get(first.name.slice(5)).body.statements, locals));
+        continue;
+      }
+      if (first.name === 'ForEach') {
+        const items = evaluate(first.args[0], locals); const callback = first.args[1];
+        assert.ok(ts.isArrowFunction(callback) && ts.isBlock(callback.body), 'Record actual ForEach content');
+        items.forEach((item, itemIndex) => {
+          const values = [item, itemIndex]; const scope = { ...locals };
+          callback.parameters.forEach((parameter, i) => { scope[parameter.name.getText(ast)] = values[i]; });
+          nodes.push(...record(callback.body.statements, scope));
+        });
+        continue;
+      }
+      const node = { type: first.name, args: Array.from(first.args, arg => evaluate(arg, locals)), props: {}, children: [] };
+      const apply = modifiers => {
+        for (const modifier of modifiers) node.props[modifier.name] = modifier.args.length === 1 ? evaluate(modifier.args[0], locals) : Array.from(modifier.args, arg => evaluate(arg, locals));
+      };
+      apply(calls.slice(1));
+      if (statements[index + 1] && ts.isBlock(statements[index + 1])) {
+        node.children = record(statements[++index].statements, locals);
+        const modifiers = statements[index + 1];
+        // The SDK parser omits the leading dot in getText() for post-block modifiers.
+        if (modifiers && ts.isExpressionStatement(modifiers) && /^[a-z]/.test(chain(modifiers.expression)[0].name) && !chain(modifiers.expression)[0].name.startsWith('this.')) {
+          apply(chain(modifiers.expression)); index++;
+        }
+      }
+      nodes.push(node);
+    }
+    return nodes;
+  }
+  const flatten = node => [node, ...node.children.flatMap(flatten)];
+  return {
+    page,
+    render: () => record(builders.get('build').body.statements).flatMap(flatten),
+    find: (nodes, id) => nodes.find(node => node.props.id === id)
+  };
+}
+
+test('ordinary example-task view keeps progress and tasks visible while hiding demonstration controls', async () => {
+  const h = harness(); const store = h.store(); await store.load();
+  const ui = networkPageHarness(store); const nodes = ui.render();
+  assert.equal(ui.page.showDemoSettings, false, 'Demonstration settings must start collapsed');
+  for (const id of ['network-chart', 'network-list', 'network-refresh', 'network-demo-settings-toggle']) assert.ok(ui.find(nodes, id), `Primary view must expose ${id}`);
+  for (const id of ['network-normal', 'network-empty', 'network-error', 'network-proxy-host', 'network-proxy-toggle']) assert.equal(ui.find(nodes, id), undefined, `Primary view must not expose ${id}`);
+  assert.equal(ui.find(nodes, 'network-refresh').props.enabled, true);
+  let finish;
+  h.respond = () => new Promise(resolve => { finish = resolve; });
+  ui.find(nodes, 'network-refresh').props.onClick();
+  assert.equal(h.requests.at(-1).url, 'https://jsonplaceholder.typicode.com/todos');
+  let refreshing = ui.render();
+  assert.ok(ui.find(refreshing, 'network-loading'));
+  assert.equal(ui.find(refreshing, 'network-refresh').props.enabled, false, 'Refresh stays disabled while its request is in flight');
+  assert.ok(ui.find(refreshing, 'network-list'), 'Refreshing should keep the existing task content visible');
+  finish(settleResponse([{ id: 7, title: 'updated example', completed: false }]));
+  await new Promise(resolve => setImmediate(resolve));
+  refreshing = ui.render();
+  assert.equal(ui.find(refreshing, 'network-loading'), undefined);
+  assert.equal(ui.find(refreshing, 'network-refresh').props.enabled, true);
+  assert.ok(ui.find(refreshing, 'network-item-7'), 'The real refresh callback must replace the displayed task data');
+});
+
+test('demonstration settings reveal scenario controls only after an explicit toggle and collapse again', async () => {
+  const h = harness(); const store = h.store(); await store.load();
+  const ui = networkPageHarness(store); const before = h.requests.length;
+  let nodes = ui.render();
+  const toggle = ui.find(nodes, 'network-demo-settings-toggle');
+  assert.equal(typeof toggle?.props.onClick, 'function', 'Provide an accessible settings toggle');
+  toggle.props.onClick(); nodes = ui.render();
+  assert.equal(ui.page.showDemoSettings, true);
+  for (const id of ['network-normal', 'network-empty', 'network-error', 'network-proxy-toggle']) assert.ok(ui.find(nodes, id), `Expanded settings must expose ${id}`);
+  assert.equal(h.requests.length, before, 'Opening settings alone must not issue a request');
+  ui.find(nodes, 'network-proxy-toggle').props.onClick(); nodes = ui.render();
+  for (const id of ['network-proxy-host', 'network-proxy-port', 'network-proxy-apply', 'network-proxy-system']) assert.ok(ui.find(nodes, id), `Proxy fields must remain reachable through settings: ${id}`);
+  assert.equal(h.requests.length, before, 'Opening the proxy form alone must not issue a request');
+  ui.find(nodes, 'network-demo-settings-toggle').props.onClick(); nodes = ui.render();
+  assert.equal(ui.page.showDemoSettings, false);
+  assert.equal(ui.page.proxyOpen, false, 'Collapsing demonstration settings also hides the nested proxy form');
+  assert.equal(ui.find(nodes, 'network-error'), undefined);
+  assert.ok(ui.find(nodes, 'network-list'), 'Closing settings must preserve visible task content');
+});
+
+test('failure and empty demonstrations offer a normal return path while advanced retry keeps its current request', async () => {
+  const h = harness(); const store = h.store(); h.respond = async () => settleResponse(groupedResponse()); await store.load('normal', 2);
+  h.respond = async () => ({ responseCode: 404, result: '{}' }); await store.load('error');
+  const ui = networkPageHarness(store); let nodes = ui.render();
+  assert.ok(ui.find(nodes, 'network-chart'), 'A failed refresh must retain the last successful progress');
+  assert.ok(ui.find(nodes, 'network-list'), 'A failed refresh must retain the last successful tasks');
+  assert.ok(nodes.some(node => node.type === 'Text' && /上次|之前/.test(node.args[0]) && /结果|任务/.test(node.args[0])), 'Explain that the retained content belongs to the previous load');
+  assert.equal(nodes.some(node => node.type === 'Text' && node.args[0] === store.error), false, 'Raw transport errors should stay inside the optional demonstration settings');
+  const normal = ui.find(nodes, 'network-return-normal');
+  assert.equal(typeof normal?.props.onClick, 'function', 'Offer a visible escape from an intentionally failing demo');
+  // Retrying an intentionally failing request belongs to the explicitly expanded demo controls.
+  ui.find(nodes, 'network-demo-settings-toggle').props.onClick(); nodes = ui.render();
+  const retry = ui.find(nodes, 'network-retry');
+  assert.equal(typeof retry?.props.onClick, 'function');
+  retry.props.onClick(); await store.load();
+  assert.equal(h.requests.at(-1).url, 'https://jsonplaceholder.typicode.com/this-route-does-not-exist', 'Retry should preserve the selected scenario');
+  h.respond = async () => settleResponse(groupedResponse());
+  normal.props.onClick(); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(store.mode, 'normal'); assert.equal(store.sampleGroup, 2);
+  assert.equal(store.error, ''); assert.equal(store.items[0].id, 6);
+  h.respond = async () => settleResponse([]); await store.load('empty');
+  ui.page.showDemoSettings = false; nodes = ui.render();
+  assert.ok(ui.find(nodes, 'network-empty-state'));
+  assert.equal(ui.find(nodes, 'network-chart'), undefined, 'A successful empty result must hide the old progress');
+  assert.equal(ui.find(nodes, 'network-list'), undefined, 'A successful empty result must hide the old tasks');
+  const emptyReturn = ui.find(nodes, 'network-return-normal');
+  assert.equal(typeof emptyReturn?.props.onClick, 'function', 'Empty demonstrations also need an ordinary recovery action');
+  h.respond = async () => settleResponse(groupedResponse()); emptyReturn.props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(store.mode, 'normal'); assert.equal(store.sampleGroup, 2);
+  assert.equal(store.items[0].id, 6); assert.ok(ui.find(ui.render(), 'network-list'));
+});
+
+test('entering while an error-demo request is in flight eventually restores normal tasks and closes settings', async () => {
+  const h = harness(); const store = h.store(); h.respond = async () => settleResponse(groupedResponse()); await store.load('normal', 2);
+  let finish;
+  h.respond = () => new Promise(resolve => { finish = resolve; });
+  const errorRequest = store.load('error');
+  assert.equal(store.loading, true); assert.equal(store.mode, 'error');
+  const ui = networkPageHarness(store); ui.page.showDemoSettings = true; ui.page.proxyOpen = true;
+  ui.page.aboutToAppear();
+  assert.equal(ui.page.showDemoSettings, false); assert.equal(ui.page.proxyOpen, false);
+  h.respond = async () => settleResponse(groupedResponse());
+  finish({ responseCode: 404, result: '{}' }); await errorRequest;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(store.mode, 'normal', 'Entry must recover after the merged error request settles');
+  assert.equal(store.loading, false); assert.equal(store.error, ''); assert.equal(store.items[0].id, 6);
+  assert.deepEqual(h.requests.map(request => request.url), [
+    'https://jsonplaceholder.typicode.com/todos',
+    'https://jsonplaceholder.typicode.com/this-route-does-not-exist',
+    'https://jsonplaceholder.typicode.com/todos'
+  ]);
+});
+
 test('normal groups take different five-item slices from each fresh response and preserve the default API', async () => {
   const h = harness(); h.respond = async () => settleResponse(groupedResponse());
   assert.deepEqual(plain((await h.fetch('normal')).map(item => item.id)), [1, 2, 3, 4, 5]);
@@ -249,7 +441,7 @@ test('loading rejects proxy changes while preserving the active request configur
 });
 test('proxy settings are foldable session UI and short pages align at the top', () => {
   const page = fs.readFileSync(path.join(sourceRoot, 'pages/NetworkPage.ets'), 'utf8');
-  assert.match(page, /预览网络设置/); assert.match(page, /当前预览会话/); assert.match(page, /不写入文件/); assert.match(page, /\.align\(Alignment\.Top\)/);
+  assert.match(page, /不写入文件/); assert.match(page, /\.align\(Alignment\.Top\)/);
   for (const id of ['network-proxy-toggle', 'network-proxy-host', 'network-proxy-port', 'network-proxy-apply', 'network-proxy-system']) assert.ok(page.includes(`.id('${id}')`), `Missing test id ${id}`);
   assert.doesNotMatch(page, /127\.0\.0\.1|10090/);
   for (const id of ['network-normal', 'network-empty', 'network-error']) {
@@ -260,12 +452,14 @@ test('proxy settings are foldable session UI and short pages align at the top', 
 test('NetworkPage starts its own load, Home opens the registered route and chart is native', () => {
   const file = path.join(sourceRoot, 'pages/NetworkPage.ets'); assert.ok(fs.existsSync(file), 'NetworkPage must exist');
   const page = fs.readFileSync(file, 'utf8'); const home = fs.readFileSync(path.join(sourceRoot, 'pages/HomePage.ets'), 'utf8'); const index = fs.readFileSync(path.join(sourceRoot, 'pages/Index.ets'), 'utf8');
-  const start = page.indexOf('  aboutToAppear(): void {'); const end = page.indexOf('\n  }', start); assert.ok(start >= 0 && end > start);
-  const pageCode = ts.transpileModule(`class Page { ${page.slice(start, end + 4)} } exports.Page = Page;`, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
-  const sandbox = { exports: {} }; vm.runInNewContext(pageCode, sandbox); const p = new sandbox.exports.Page(); let loads = 0; p.store = { load: () => { loads++; return Promise.resolve(); } }; p.aboutToAppear(); assert.equal(loads, 1);
-  assert.match(home, /pushPathByName\('Network', null\)/); assert.match(home, /网络示例/); assert.match(index, /name === 'Network'/); assert.match(index, /NetworkPage\(\{/);
+  const calls = []; const store = { mode: 'normal', load: (...args) => { calls.push(args); return Promise.resolve(); } };
+  const ui = networkPageHarness(store); ui.page.showDemoSettings = true; ui.page.proxyOpen = true;
+  ui.page.aboutToAppear();
+  assert.deepEqual(calls, [['normal']], 'Page entry requests ordinary tasks explicitly');
+  assert.equal(ui.page.showDemoSettings, false); assert.equal(ui.page.proxyOpen, false);
+  assert.match(home, /pushPathByName\('Network', null\)/); assert.match(home, /示例任务/); assert.match(index, /name === 'Network'/); assert.match(index, /NetworkPage\(\{/);
   assert.match(page, /NavDestination\(\)/); assert.match(page, /Refresh\(/); assert.match(page, /Scroll\(\)/); assert.match(page, /onRefreshing/);
   assert.match(page, /DataPanel\(\{[\s\S]*?values: this\.store\.chartValues[\s\S]*?type: DataPanelType\.Circle/);
-  assert.match(page, /if \(this\.store\.items\.length > 0\)/); assert.match(page, /上次成功/); assert.match(page, /远端/);
+  assert.match(page, /if \(this\.store\.items\.length > 0\)/); assert.match(page, /远端/);
   for (const id of ['network-refresh', 'network-normal', 'network-empty', 'network-error', 'network-retry', 'network-chart']) assert.ok(page.includes(`.id('${id}')`), `Missing test id ${id}`);
 });

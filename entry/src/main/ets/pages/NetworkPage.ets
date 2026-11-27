@@ -9,18 +9,36 @@ export struct NetworkPage {
   @Param navPathStack: NavPathStack = new NavPathStack();
   @Local store: NetworkStore = NetworkStore.instance;
   @Local refreshing: boolean = false;
+  @Local showDemoSettings: boolean = false;
   @Local proxyOpen: boolean = false;
   @Local proxyHostInput: string = '';
   @Local proxyPortInput: string = '';
 
   aboutToAppear(): void {
-    this.store.load();
+    this.showDemoSettings = false;
+    this.proxyOpen = false;
+    this.loadExamples();
+  }
+
+  private async loadExamples(): Promise<void> {
+    await this.store.load('normal');
+    // 进入页面时可能还有上一次演示请求在途，结束后再恢复普通浏览。
+    if (this.store.mode !== 'normal') {
+      await this.store.load('normal');
+    }
   }
 
   private refresh(): void {
-    this.store.load().finally(() => {
+    this.loadExamples().finally(() => {
       this.refreshing = false;
     });
+  }
+
+  private toggleDemoSettings(): void {
+    this.showDemoSettings = !this.showDemoSettings;
+    if (!this.showDemoSettings) {
+      this.proxyOpen = false;
+    }
   }
 
   private toggleProxySettings(): void {
@@ -47,15 +65,16 @@ export struct NetworkPage {
     if (mode === 'error') {
       return 'HTTP 错误';
     }
-    return `正常列表 · 第 ${sampleGroup} 组`;
+    return `示例任务 · 第 ${sampleGroup} 组`;
   }
 
   private updatedLabel(): string {
     if (this.store.lastUpdatedAt === 0) {
-      return '尚无成功结果';
+      return '下拉即可刷新示例';
     }
     const d = new Date(this.store.lastUpdatedAt);
-    return `上次成功：${d.toLocaleTimeString()} · ${this.scenarioLabel(this.store.lastSuccessfulMode, this.store.lastSuccessfulGroup)}`;
+    const time: string = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    return `更新于 ${time} · ${this.scenarioLabel(this.store.lastSuccessfulMode, this.store.lastSuccessfulGroup)}`;
   }
 
   build() {
@@ -71,13 +90,14 @@ export struct NetworkPage {
           .width(40)
           .height(40)
           .backgroundColor(Theme.card)
+          .accessibilityText('返回首页')
           .onClick(() => { this.navPathStack.pop(); })
-          Text('网络示例')
+          Text('示例任务')
             .fontSize(Theme.tTitle)
             .fontWeight(FontWeight.Bold)
             .fontColor(Theme.fg)
             .layoutWeight(1)
-          Button(this.store.loading ? '请求中' : '刷新')
+          Button(this.store.loading ? '加载中' : '刷新')
             .id('network-refresh')
             .fontSize(Theme.tSub)
             .fontColor(Theme.onAccent)
@@ -92,8 +112,25 @@ export struct NetworkPage {
         Refresh({ refreshing: $$this.refreshing }) {
           Scroll() {
             Column({ space: 16 }) {
-              this.scenarios()
-              this.previewNetworkSettings()
+              Row({ space: 12 }) {
+                Text('浏览公开任务，看看完成进度')
+                  .fontSize(Theme.tSub)
+                  .fontColor(Theme.fgDim)
+                  .layoutWeight(1)
+                Button(this.showDemoSettings ? '收起设置' : '演示设置')
+                  .id('network-demo-settings-toggle')
+                  .height(36)
+                  .padding({ left: 10, right: 10 })
+                  .fontSize(Theme.tMicro)
+                  .fontColor(Theme.fgDim)
+                  .backgroundColor(Color.Transparent)
+                  .accessibilityText(this.showDemoSettings ? '收起演示设置' : '展开演示设置')
+                  .onClick(() => this.toggleDemoSettings())
+              }.width('100%')
+
+              if (this.showDemoSettings) {
+                this.demoSettings()
+              }
 
               if (this.store.loading) {
                 Row({ space: 10 }) {
@@ -101,7 +138,7 @@ export struct NetworkPage {
                     .width(24)
                     .height(24)
                     .color(Theme.accent)
-                  Text('正在请求远端数据…')
+                  Text(this.store.items.length > 0 ? '正在更新任务…' : '正在加载示例任务…')
                     .fontSize(Theme.tSub)
                     .fontColor(Theme.fgDim)
                 }
@@ -124,14 +161,15 @@ export struct NetworkPage {
                   SymbolGlyph(Sym.inbox)
                     .fontSize(40)
                     .fontColor([Theme.fgFaint])
-                  Text('远端返回空列表')
+                  Text('暂时没有示例任务')
                     .fontSize(Theme.tBody)
                     .fontWeight(FontWeight.Medium)
                     .fontColor(Theme.fg)
-                  Text('请求已成功，本次没有待办数据。可切回“正常”场景再次请求。')
+                  Text('这里还没有可展示的内容，重新加载一组试试。')
                     .fontSize(Theme.tSub)
                     .fontColor(Theme.fgDim)
                     .textAlign(TextAlign.Center)
+                  this.reloadExamples()
                 }
                 .id('network-empty-state')
                 .padding(24)
@@ -145,7 +183,7 @@ export struct NetworkPage {
                 .fontSize(Theme.tMicro)
                 .fontColor(Theme.fgDim)
                 .width('100%')
-              Text('数据来源：JSONPlaceholder 公开测试服务。这里只展示远端示例，不会导入或覆盖个人待办。成功列表支持下拉刷新。')
+              Text('公开示例仅供查看，不会改动你的待办。')
                 .fontSize(Theme.tMicro)
                 .fontColor(Theme.fgFaint)
                 .width('100%')
@@ -172,9 +210,27 @@ export struct NetworkPage {
   }
 
   @Builder
+  demoSettings() {
+    Column({ space: 12 }) {
+      Text('课堂演示')
+        .fontSize(Theme.tSub)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Theme.fgDim)
+      Text('以下选项用于演示空内容、加载失败和网络配置。日常浏览直接刷新即可。')
+        .fontSize(Theme.tMicro)
+        .fontColor(Theme.fgDim)
+      this.scenarios()
+      this.previewNetworkSettings()
+      Text('数据来源：JSONPlaceholder 公开测试服务。这里只展示远端示例，不写入个人任务库。')
+        .fontSize(Theme.tMicro)
+        .fontColor(Theme.fgDim)
+    }.id('network-demo-settings').width('100%').alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
   scenarios() {
     Column({ space: 10 }) {
-      Text('远端请求场景')
+      Text('演示场景')
         .fontSize(Theme.tBody)
         .fontWeight(FontWeight.Medium)
         .fontColor(Theme.fg)
@@ -211,15 +267,7 @@ export struct NetworkPage {
           .onClick(() => { this.store.load('error'); })
       }
       .width('100%')
-      Button(`切换正常样本：请求第 ${this.store.sampleGroup === 1 ? 2 : 1} 组`)
-        .id('network-next-group')
-        .height(36)
-        .fontSize(Theme.tSub)
-        .fontColor(Theme.accent)
-        .backgroundColor(Theme.cardHi)
-        .enabled(!this.store.loading)
-        .onClick(() => { this.store.loadNextGroup(); })
-      Text('正常：GET /todos，每次从真实响应取样，第 1 组为第 1–5 条，第 2 组为第 6–10 条，刷新保持当前组；空列表：GET /todos?userId=0；错误：GET /this-route-does-not-exist，预期远端返回 404。三种场景都实际联网，返回结果以服务端为准。')
+      Text('正常：GET /todos，第1组取第1–5条，第2组取第6–10条；空列表：GET /todos?userId=0；HTTP错误：GET /this-route-does-not-exist，预期404。各场景均发出真实请求。顶部刷新恢复正常列表，保留当前分组。')
         .fontSize(Theme.tMicro)
         .fontColor(Theme.fgDim)
       Text(`本次请求：${this.scenarioLabel(this.store.mode)}`)
@@ -309,30 +357,46 @@ export struct NetworkPage {
   }
 
   @Builder
+  reloadExamples() {
+    Button('重新加载示例')
+      .id('network-return-normal')
+      .height(40)
+      .fontSize(Theme.tSub)
+      .fontColor(Theme.onAccent)
+      .backgroundColor(Theme.accent)
+      .enabled(!this.store.loading)
+      .onClick(() => this.refresh())
+  }
+
+  @Builder
   failure() {
     Column({ space: 10 }) {
       Row({ space: 8 }) {
         SymbolGlyph(Sym.cloudOff)
           .fontSize(22)
           .fontColor([Theme.danger])
-        Text('远端请求失败')
+        Text(this.store.items.length > 0 ? '暂时没能更新任务' : '示例任务加载失败')
           .fontSize(Theme.tBody)
           .fontColor(Theme.fg)
       }
-      Text(this.store.error)
-        .id('network-error-message')
-        .fontSize(Theme.tSub)
-        .fontColor(Theme.danger)
-      Text(this.store.loaded ? '以下仍为上次成功结果，并非本次请求的新数据。' : '还没有成功结果，请重试或切换到正常场景。')
+      Text(this.store.items.length > 0 ? '下方显示上次加载的结果，你可以稍后再试。' : '请检查网络连接，然后重新加载。')
         .fontSize(Theme.tSub)
         .fontColor(Theme.fgDim)
-      Button('重试本场景')
-        .id('network-retry')
-        .fontSize(Theme.tSub)
-        .fontColor(Theme.onAccent)
-        .backgroundColor(Theme.accent)
-        .enabled(!this.store.loading)
-        .onClick(() => this.refresh())
+      this.reloadExamples()
+      if (this.showDemoSettings) {
+        Text(this.store.error)
+          .id('network-error-message')
+          .fontSize(Theme.tMicro)
+          .fontColor(Theme.danger)
+        Button('重试此演示')
+          .id('network-retry')
+          .height(36)
+          .fontSize(Theme.tSub)
+          .fontColor(Theme.accent)
+          .backgroundColor(Theme.cardHi)
+          .enabled(!this.store.loading)
+          .onClick(() => { this.store.load(); })
+      }
     }
     .alignItems(HorizontalAlign.Start)
     .padding(16)
@@ -343,15 +407,7 @@ export struct NetworkPage {
 
   @Builder
   chart() {
-    Column({ space: 12 }) {
-      Text('远端列表完成比例')
-        .fontSize(Theme.tBody)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(Theme.fg)
-      Text(`数据来源：${this.scenarioLabel(this.store.lastSuccessfulMode, this.store.lastSuccessfulGroup)}`)
-        .id('network-chart-source')
-        .fontSize(Theme.tMicro)
-        .fontColor(Theme.fgDim)
+    Row({ space: 18 }) {
       Stack() {
         DataPanel({
           values: this.store.chartValues,
@@ -359,15 +415,15 @@ export struct NetworkPage {
           type: DataPanelType.Circle
         })
           .id('network-chart')
-          .width(152)
-          .height(152)
+          .width(96)
+          .height(96)
           .valueColors([Theme.accent, Theme.fgFaint])
           .trackBackgroundColor(Theme.cardHi)
-          .strokeWidth(12)
+          .strokeWidth(8)
           .closeEffect(true)
         Column({ space: 4 }) {
           Text(`${Math.round(this.store.doneCount / this.store.items.length * 100)}%`)
-            .fontSize(28)
+            .fontSize(24)
             .fontWeight(FontWeight.Bold)
             .fontColor(Theme.fg)
           Text('已完成')
@@ -375,24 +431,21 @@ export struct NetworkPage {
             .fontColor(Theme.fgDim)
         }
       }
-      .width('100%')
-      Row({ space: 20 }) {
-        Row({ space: 6 }) {
-          Circle().width(8).height(8).fill(Theme.accent)
-          Text(`已完成 ${this.store.doneCount}`)
-            .fontSize(Theme.tSub)
-            .fontColor(Theme.fg)
-        }
-        Row({ space: 6 }) {
-          Circle().width(8).height(8).fill(Theme.fgFaint)
-          Text(`未完成 ${this.store.pendingCount}`)
-            .fontSize(Theme.tSub)
-            .fontColor(Theme.fg)
-        }
-      }
-      Text(`合计 ${this.store.items.length} 条 · 随每次成功请求更新`)
-        .fontSize(Theme.tMicro)
-        .fontColor(Theme.fgDim)
+      .width(96)
+      .height(96)
+      Column({ space: 8 }) {
+        Text('本组任务进度')
+          .fontSize(Theme.tBody)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Theme.fg)
+        Text(`已完成 ${this.store.doneCount} 项 · 待完成 ${this.store.pendingCount} 项`)
+          .fontSize(Theme.tSub)
+          .fontColor(Theme.fgDim)
+        Text(this.scenarioLabel(this.store.lastSuccessfulMode, this.store.lastSuccessfulGroup))
+          .id('network-chart-source')
+          .fontSize(Theme.tMicro)
+          .fontColor(Theme.fgDim)
+      }.layoutWeight(1).alignItems(HorizontalAlign.Start)
     }
     .padding(16)
     .width('100%')
@@ -403,10 +456,22 @@ export struct NetworkPage {
   @Builder
   remoteList() {
     Column({ space: 10 }) {
-      Text(`远端待办 · ${this.store.items.length} 条`)
-        .fontSize(Theme.tBody)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(Theme.fg)
+      Row({ space: 8 }) {
+        Text(`任务列表 · ${this.store.items.length} 项`)
+          .fontSize(Theme.tBody)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Theme.fg)
+          .layoutWeight(1)
+        Button('换一组')
+          .id('network-next-group')
+          .height(36)
+          .padding({ left: 12, right: 12 })
+          .fontSize(Theme.tSub)
+          .fontColor(Theme.accent)
+          .backgroundColor(Theme.cardHi)
+          .enabled(!this.store.loading)
+          .onClick(() => { this.store.loadNextGroup(); })
+      }.width('100%')
       ForEach(this.store.items, (todo: Todo) => {
         Row({ space: 10 }) {
           SymbolGlyph(todo.done ? Sym.checkCircleFill : Sym.circleDashed)
@@ -416,7 +481,9 @@ export struct NetworkPage {
             Text(todo.title)
               .fontSize(Theme.tBody)
               .fontColor(Theme.fg)
-            Text(`#${todo.id} · ${todo.done ? '已完成' : '未完成'}`)
+              .maxLines(2)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+            Text(todo.done ? '已完成' : '待完成')
               .fontSize(Theme.tMicro)
               .fontColor(Theme.fgDim)
           }

@@ -149,10 +149,10 @@ export struct HomePage {
             SymbolGlyph(Sym.refresh)
               .fontSize(15)
               .fontColor([Theme.accent])
-            Text('网络示例')
+            Text('示例任务')
               .fontSize(Theme.tSub)
               .fontColor(Theme.fg)
-            Text('远端列表 · 圆环统计')
+            Text('浏览任务 · 查看进度')
               .fontSize(Theme.tMicro)
               .fontColor(Theme.fgDim)
           }
