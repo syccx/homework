@@ -1,0 +1,206 @@
+Started: 2026-11-27 08:29:39 +08:00
+✔ offline create is marked initialized and survives reopen (6.8152ms)
+✔ existing local JSON is authoritative even without old seeded marker (1.5023ms)
+✔ first network response never overwrites a task added while loading (1.4249ms)
+✔ retry requests are deduplicated while first request is pending (1.2899ms)
+✔ retry never repopulates an intentionally empty initialized database (1.2824ms)
+✔ same deadline falls through to priority and newest creation time (1.3715ms)
+✔ malformed stored data remains recoverable and blocks accidental overwrite (1.3978ms)
+✔ broken JSON is not replaced by an empty database or network seed (1.2198ms)
+✔ synchronous flush failure is visible and saving can be retried (1.4153ms)
+✔ toggle persists both done and doneAt; toggle back clears timestamp (4.1647ms)
+✔ duplicate task IDs are repaired on add (1.4423ms)
+✔ import merges records, repairs collisions, and persists atomically (1.5502ms)
+✔ invalid import rejects the entire batch without changing current state (1.4044ms)
+✔ explicit import can recover a corrupt database after preserving original bytes (1.2724ms)
+✔ import with storage failure leaves current memory list unchanged (1.3066ms)
+✔ refresh uses local data and pushes only the latest saved snapshot (1.3056ms)
+✔ network rejects malformed records before they reach searchable state and always closes request (2.548ms)
+✔ network response must be an array and status 200 (3.5946ms)
+✔ network keeps only the first five valid sample records (2.0984ms)
+✔ invalid directly added task cannot corrupt the persisted database (1.722ms)
+✔ deleted records are excluded from counts and can be restored or permanently removed (1.6809ms)
+✔ search matches description without case sensitivity and sorting never mutates backing list (1.4988ms)
+✔ future completion timestamps never count as today or a streak (1.7174ms)
+✔ second init is idempotent and cannot overwrite subsequent local changes (1.3328ms)
+✔ context attachment does not discard tasks accepted before initialization (1.4039ms)
+✔ context attachment preserves both disk data and any accepted early draft (1.6444ms)
+✔ a failure between preference puts rolls back uncommitted cached JSON (1.235ms)
+✔ merging below-limit batches cannot create a database above the recoverable record limit (50.2376ms)
+✔ merging must not write JSON larger than the next startup can read (22.4151ms)
+✔ failed corrupt-data recovery preserves both original bytes and its durable recovery copy (1.5832ms)
+✔ recovery backup failure prevents replacing the original database (1.5379ms)
+✔ soft delete preserves completion history while permanent delete removes it (1.646ms)
+✔ yesterday-only completion keeps a streak but a gap breaks older days (1.2231ms)
+✔ editing resolves the latest stored task rather than stale route-object fields (13.4903ms)
+✔ context attachment clears the preview-only notice after saving accepted drafts (1.6128ms)
+✔ startup-draft save failure keeps accepted drafts visible and refresh can retry durably (1.3052ms)
+✔ rollback restores absent keys instead of creating a phantom initialized empty database (1.4821ms)
+✔ startup merge repairs colliding draft IDs without replacing an existing disk record (1.604ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 200.1635
+✔ system refresh reads saved tasks after the app process restarts (163.4646ms)
+✔ adding a widget shows the newest active task and ignores trash (32.6257ms)
+✔ system refresh does not reuse a stale preferences snapshot (28.0008ms)
+✔ app changes reach existing widgets without an in-memory form registry (17.8681ms)
+✔ rapid edits finish with the newest widget snapshot (15.8955ms)
+✔ network permission and scheduled widget refresh are configured (1.2958ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 266.2767
+PASS: progress excludes recycled items
+PASS: zero active items has zero progress
+PASS: empty title is blocked without writing
+PASS: successful creation returns to visible unfiltered task list
+PASS: failed persistence keeps the form open
+PASS: editing loads the latest route instance and preserves task id
+PASS: editing resolves a stale route snapshot from current saved state
+PASS: unsaved back action offers confirmation
+PASS: default deadline, date editing, time editing, full-year label, unset deadline
+✔ shared singleton is created after Trace accessors are installed (5.0429ms)
+✔ reading list and computed counts registers the actual singleton as a dependency (2.0845ms)
+✔ save from Add emits list and notice changes to the same store read by Home (2.5475ms)
+✔ Trace on Todo fields still emits changes after the decorated constructor runs (1.7924ms)
+✔ persistence failure emits reactive error and preserves the observed list (2.5037ms)
+✔ mounted Home filter counts track additions, completion and trash without remounting (46.7025ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 69.8554
+✔ ordinary example-task view keeps progress and tasks visible while hiding demonstration controls (685.3879ms)
+✔ demonstration settings reveal scenario controls only after an explicit toggle and collapse again (699.1109ms)
+✔ failure and empty demonstrations offer a normal return path while advanced retry keeps its current request (626.3972ms)
+✔ entering while an error-demo request is in flight eventually restores normal tasks and closes settings (37.351ms)
+✔ normal groups take different five-item slices from each fresh response and preserve the default API (2.7236ms)
+✔ invalid normal sample groups fail before opening a request (2.5564ms)
+✔ invalid Store groups preserve the last valid selection and ordinary refresh remains usable (2.7333ms)
+✔ invalid Store modes preserve the last valid selection and ordinary refresh remains usable (2.3296ms)
+✔ switching normal sample groups requests again, changes chart values and refreshes the selected group (2.823ms)
+✔ failed group requests preserve successful group labels and retry the selected sample (23.0027ms)
+✔ empty and error scenarios keep the chosen normal group for a clear return to normal (8.2374ms)
+✔ normal sample switch is accessible and the chart names the successful source group (0.9157ms)
+✔ remote API whitelists real normal / empty / error paths, keeps legacy default API (2.4848ms)
+✔ normal remote request validates and maps only first five todos (2.0528ms)
+✔ HTTP failure, transport rejection, invalid JSON and malformed payload all destroy the request (2.1132ms)
+✔ network singleton is lazy and its Trace fields keep real SDK accessors (1.6449ms)
+✔ first load exposes loading before completion and success updates list and chart counts reactively (1.923ms)
+✔ every settled refresh performs a new request rather than stopping after first success (1.8782ms)
+✔ concurrent loads merge into the same request and cannot change its active mode (2.034ms)
+✔ refresh failure preserves successful items, chart and update time then retry recovers (1.9806ms)
+✔ initial failure is retryable and successful remote empty response is a loaded zero state (2.0121ms)
+✔ loading network examples never reads or replaces personal TodoStore data (1.8897ms)
+✔ API passes an optional typed HTTP proxy and defaults back to system proxy (1.7549ms)
+✔ applying session proxy validates, refreshes current scenario and never persists personal data (2.2308ms)
+✔ proxy rejects incomplete host/port, protocols, paths, newlines and invalid port syntax without requests (1.9911ms)
+✔ proxy boundary ports are accepted and empty fields explicitly restore system mode (2.0295ms)
+✔ loading rejects proxy changes while preserving the active request configuration (2.0091ms)
+✔ proxy settings are foldable session UI and short pages align at the top (0.8809ms)
+✔ NetworkPage starts its own load, Home opens the registered route and chart is native (23.9185ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2159.1552
+✔ unswiped pending and completed cards hide and disable the delete layer (330.4479ms)
+✔ completed cards keep an opaque foreground while weakening their text (177.9038ms)
+✔ the opaque card foreground fills the fixed height with and without description (169.695ms)
+✔ left swipe reveals deletion and closing or cancelling hides it again without changing callback wiring (277.367ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 974.982
+✔ actual SDK-decorated preview imports through the real TodoStore and persists plain public fields (11.0198ms)
+✔ real storage flush failure preserves the whole preview and can retry after disk recovers (3.1972ms)
+✔ actual corrupt-data protection blocks assistant import without touching original bytes (2.4008ms)
+✔ posts only the goal to the fixed HTTPS endpoint with Bearer auth and JSON mode (3.018ms)
+✔ empty / malformed keys and empty / oversized goals never open a connection (1.8095ms)
+✔ optional proxy is passed without changing the target URL (2.7181ms)
+✔ HTTP 401 yields a safe useful message and destroys the request (1.5578ms)
+✔ HTTP 402 yields a safe useful message and destroys the request (1.4263ms)
+✔ HTTP 429 yields a safe useful message and destroys the request (1.2246ms)
+✔ HTTP 500 yields a safe useful message and destroys the request (1.3777ms)
+✔ HTTP 503 yields a safe useful message and destroys the request (1.3193ms)
+✔ HTTP 400 yields a safe useful message and destroys the request (1.1136ms)
+✔ transport errors never expose raw credentials and always release resources (1.4376ms)
+✔ truncated/refused and invalid envelopes are rejected as a whole (1.4835ms)
+✔ plans validate all entries, bounds and duplicate titles before returning any tasks (2.0669ms)
+✔ key configuration is session-only, validates first, and clearing removes it (1.4078ms)
+✔ offline example has an explicit source and never contacts API or writes personal data (1.179ms)
+✔ generation requires key and preserves an earlier clearly-labelled preview on failure (1.4403ms)
+✔ in-flight generation is single request and key/example changes are blocked (1.291ms)
+✔ confirm adds the full preview atomically once and resets home filters (1.4765ms)
+✔ failed persistence keeps preview retryable and does not mark it added (1.3033ms)
+✔ blocked local data cannot be overwritten through assistant import (1.0396ms)
+✔ proxy validation has no request side effects and is session-only (1.5102ms)
+✔ assistant page exposes masked key, confirmation, honest source labels and accessible entry (2.6891ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 62.8808
+> hvigor [32mUP-TO-DATE :entry:default@PreBuild...  [39m
+> hvigor [32mFinished :entry:default@CreateModuleInfo... after 2 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@GenerateMetadata...  [39m
+> hvigor [32mFinished :entry:default@ConfigureCmake... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@MergeProfile...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@CreateBuildProfile...  [39m
+> hvigor [32mFinished :entry:default@PreCheckSyscap... after 1 ms [39m
+> hvigor [32mFinished :entry:default@GeneratePkgContextInfo... after 11 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@GeneratePkgSdkInfo...  [39m
+> hvigor [32mFinished :entry:default@ProcessIntegratedHsp... after 1 ms [39m
+> hvigor [32mFinished :entry:default@BuildNativeWithCmake... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@MakePackInfo...  [39m
+> hvigor [32mFinished :entry:default@SyscapTransform... after 19 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@ProcessProfile...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@ProcessRouterMap...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@ProcessShareConfig...  [39m
+> hvigor [32mFinished :entry:default@ProcessStartupConfig... after 2 ms [39m
+> hvigor [32mFinished :entry:default@BuildNativeWithNinja... after 2 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@ProcessResource...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@GenerateLoaderJson...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@ProcessLibs...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@CompileResource...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@DoNativeStrip...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@CompileArkTS...  [39m
+> hvigor [32mFinished :entry:default@BuildJS... after 3 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@CacheNativeLibs...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@GeneratePkgModuleJson...  [39m
+> hvigor [32mFinished :entry:default@ProcessCompiledResources... after 2 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@PackageHap...  [39m
+> hvigor [32mFinished :entry:default@PackingCheck... after 13 ms [39m
+> hvigor WARN: Will skip sign 'hos_hap'. No signingConfigs profile is configured in current project.
+             If needed, configure the signingConfigs in D:\DevEcoStudioProjects\TodoApp\build-profile.json5.
+> hvigor [32mFinished :entry:default@SignHap... after 4 ms [39m
+> hvigor [32mFinished :entry:default@CollectDebugSymbol... after 2 ms [39m
+> hvigor [32mFinished :entry:assembleHap... after 1 ms [39m
+> hvigor [32mBUILD SUCCESSFUL in 4 s 303 ms [39m
+
+33 tasks in total: 15 executed, 18 up-to-date
+所有本地检查通过。课程 Previewer 交互结果请另看本轮验收记录；设备存储与卡片宿主为扩展验证。
+Finished: 2026-11-27 08:29:57 +08:00
+VERIFY_EXIT_CODE=0

@@ -1,0 +1,53 @@
+{
+  "environment": "HarmonyOS emulator 127.0.0.1:5555",
+  "viewport": "1256 x 2760",
+  "date": "2026-11-26",
+  "codeCommits": [
+    "a3533f3",
+    "3d8e66b"
+  ],
+  "checks": {
+    "homeAdd": [
+      3,
+      3,
+      0
+    ],
+    "homeComplete": [
+      3,
+      2,
+      1
+    ],
+    "homeUndoComplete": [
+      3,
+      3,
+      0
+    ],
+    "homeSoftDelete": [
+      2,
+      2,
+      0
+    ],
+    "homeRestore": [
+      3,
+      3,
+      0
+    ],
+    "emptyHasNoChart": true,
+    "http404PreservesGroup2Chart": true,
+    "retryObserved404": true,
+    "normalRecovered40Percent": true,
+    "buttonRefreshUpdatedTime": [
+      "上次成功：10:38:26 PM · 正常列表 · 第 2 组",
+      "上次成功：10:38:38 PM · 正常列表 · 第 2 组"
+    ],
+    "pullRefreshUpdatedTime": [
+      "上次成功：10:38:38 PM · 正常列表 · 第 2 组",
+      "上次成功：10:39:06 PM · 正常列表 · 第 2 组"
+    ]
+  },
+  "limits": [
+    "选题登记需要本人核实",
+    "2026-11-26工程基线前Git历史缺失",
+    "本轮屏幕适配验证仅限记录的模拟器屏幅"
+  ]
+}

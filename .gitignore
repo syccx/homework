@@ -26,3 +26,6 @@ phoneSettingConfig*.json
 *.log
 Thumbs.db
 .DS_Store
+
+# Office temporary lock files
+~$*.docx
